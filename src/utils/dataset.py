@@ -3,12 +3,12 @@ from torch.utils.data import Dataset, DataLoader
 import torch
 
 class StockDataset(Dataset):
-    def __init__(self, img_dir="./src/stock_data/all_stocks_5yr.csv"):
-        self.img_dir = img_dir
+    def __init__(self, data_dir="./src/stock_data/all_stocks_5yr.csv"):
+        self.data_dir = data_dir
         self.dataset, self.index_to_asset_map = self._preprocess_dataset()
 
     def _read_dataset_as_df(self):
-        return pd.read_csv(filepath_or_buffer=self.img_dir, header=0)
+        return pd.read_csv(filepath_or_buffer=self.data_dir, header=0)
 
     def _preprocess_dataset(self):
         df = self._read_dataset_as_df()

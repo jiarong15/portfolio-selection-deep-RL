@@ -1,7 +1,7 @@
 from replay_buffer import ReplayBuffer
 from network import Q_network
 from lightning import LightningModule
-from policy import GradientPolicy
+from src.utils.policy import GradientPolicy
 import torch
 
 def polyak_average(network, target_network, tau=0.01):
