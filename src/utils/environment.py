@@ -8,8 +8,7 @@ class AssetState:
         self.window_length = window_length
         self.is_at_end_state = False
 
-        ## number of stocks and features
-
+        ## number of stocks and features:
         ## Number of assets = nb_stocks + 1
         ## to account for the cash asset as well
         self.nb_stocks = self.overall_data.shape[0]
@@ -87,7 +86,7 @@ class AssetState:
 
 class TradeEnvironment:
     def __init__(self, asset_state, time_index, train_size=0.85,
-                 trading_cost= 0.25/100, interest_rate= 0.02/250):
+                 trading_cost=0.25/100, interest_rate=0.05/100):
     
         self.asset_state = asset_state
         self.trading_cost = trading_cost
@@ -109,13 +108,10 @@ class TradeEnvironment:
                                                   self.interest_rate, self.time_index)
         self.time_index = self.time_index + 1
         state = self.asset_state.get_data_with_time_horizon(self.time_index)
-
         if self.time_index >= self.end_train:
             self.asset_state.update_asset_status()
-
-        is_done = self.asset_state.get_asset_status()
-
-        return state, reward, is_done
+        is_state_done = self.asset_state.get_asset_status()
+        return state, reward, is_state_done
         
         
         
