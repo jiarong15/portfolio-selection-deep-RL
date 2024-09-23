@@ -15,8 +15,12 @@ class AssetState:
         self.nb_assets = self.nb_stocks + 1
 
         ## Both should be of size self.nb_stocks
-        self.weight = self._get_initial_portfolio_weights()
+        self.weight = self._initial_portfolio_weights()
         self.portfolio = invested_money
+    
+
+    def end_training_period(self, training_size):
+        return int((self.overall_data.shape[1] - self.window_length) * training_size)  
 
     ## With index 0 as the cash asset, our starting
     ## weight distribution is such that all our assets
@@ -27,7 +31,9 @@ class AssetState:
     
     def _compute_asset_price_change(self, time_t):
         closing_prices = self.overall_data[:, time_t, 3]
-        price_change = closing_prices[1:] / closing_prices[:-1]
+        opening_prices = self.overall_data[:, time_t, 0]
+        price_change = closing_prices / opening_prices
+
         return price_change
     
     def _get_potential_portfolio_increment_after_days(self, interest, time_t):
@@ -74,9 +80,9 @@ class AssetState:
         return reward
 
 
-    def reset_state(self):
+    def reset_state(self, init_time):
         self.is_at_end_state = False
-        init_timeframe_data = self.get_data_with_time_horizon(self.overall_data)
+        init_timeframe_data = self.get_data_with_time_horizon(init_time)
         self.weight = self._initial_portfolio_weights()
         self.portfolio = self.invested_money
         state = init_timeframe_data
@@ -85,21 +91,26 @@ class AssetState:
 
 
 class TradeEnvironment:
+
+    ## We will start at time index 1 to be able
+    ## to account for previous day change
     def __init__(self, asset_state, time_index, train_size=0.85,
-                 trading_cost=0.25/100, interest_rate=0.05/100):
+                 trading_cost=0.25/100, interest_rate=0.05/100, window_length=50):
     
         self.asset_state = asset_state
         self.trading_cost = trading_cost
         self.interest_rate = interest_rate
-        self.time_index = time_index
-        self.end_train = int((self.data.shape[2]-self.window_length)*train_size)  
+        self.window_length = window_length
+        self.time_index = time_index + self.window_length
+        self.end_train = self.asset_state.end_training_period(train_size)
 
     def reset(self):
         """
         Restarts the environment with given
         initial weights and given value of portfolio
         """
-        return self.asset_state.reset_state()
+        self.time_index = self.window_length
+        return self.asset_state.reset_state(self.time_index)
     
 
     def step(self, action):

@@ -1,5 +1,6 @@
 import pandas as pd
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
+import random
 import torch
 
 class StockDataset(Dataset):
@@ -30,6 +31,11 @@ class StockDataset(Dataset):
             index = index + 1
 
         return torch.stack(output), mapping
+    
+    def get_assets_at_random(self, n):
+        total_num_asset = self.dataset.shape[0]
+        rand_indices = [random.randint(0, total_num_asset) for _ in range(n)]
+        return self.dataset[rand_indices, :, :]
 
     def __len__(self):
         return len(self.dataset)
@@ -37,5 +43,7 @@ class StockDataset(Dataset):
     def __getitem__(self, idx):
         return self.dataset[idx]
 
+## We wouldn't need to load it into a dataloader
+# train_dataloader = DataLoader(StockDataset(), batch_size=128, shuffle=True)
 
-train_dataloader = DataLoader(StockDataset(), batch_size=128, shuffle=True)
+
