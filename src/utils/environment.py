@@ -2,7 +2,7 @@ import numpy as np
 
 
 class AssetState:
-    def __init__(self, invested_money, overall_data, window_length=50):
+    def __init__(self, invested_money, overall_data, window_length=10):
         self.invested_money = invested_money
         self.overall_data = overall_data
         self.window_length = window_length
@@ -40,6 +40,9 @@ class AssetState:
         price_change = self._compute_asset_price_change(time_t)
         return np.array([1+interest] + price_change.tolist())
     
+    ## We compute the transaction amount based on the
+    ## current portfolio money and the normalized weight
+    ## difference. The trade cost is also considered.
     def _transaction_amount(self, action_weights, trade_cost):
         return self.portfolio * np.linalg.norm((action_weights - self.weight), ord=1) * trade_cost
 
@@ -57,18 +60,18 @@ class AssetState:
     ## timeframe. The timeframe is similar for all assets
     def get_data_with_time_horizon(self, t=0):
         return self.overall_data[:,t-self.window_length:t,:]
-    
-    ## Return total amount of money earned from
-    ## investing proportions of money by the RL trading
-    ## strategy
-    def get_portfolio_value(self):
-        return self.portfolio
-
 
     def update_asset_with_action(self, action_weights, trade_cost, interest, time_t):
+
+        ## Get the cost of the transaction for this update
         cost = self._transaction_amount(action_weights, trade_cost)
+
+        ## Amount of money allocated to each asset
         updated_pf_value = self.portfolio * action_weights
+
+        ## Amount of money allocated to each asset deducting the cost of doing this transaction
         pf_value_after_cost = updated_pf_value - np.array([cost]+ [0.]*self.nb_stocks)
+
         pf_value_with_interest = pf_value_after_cost * self._get_potential_portfolio_increment_after_days(interest, time_t)
         total_pf_sum = np.sum(pf_value_with_interest)
 
@@ -125,10 +128,3 @@ class TradeEnvironment:
         return state, reward, is_state_done
         
         
-        
-        
-        
-
-        
-        
- 

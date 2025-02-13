@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch
+## Used to generate the next set of actions to be taken by the agent.
 
 ## Building the temporal correlational
 ## convolution block
@@ -44,7 +45,7 @@ class CIN(nn.Module):
         X = self.tccb2(X)
         X = self.tccb3(X)
         X = self.conv4(X)
-        out = X.squeeze(2).permute(0,2,1)
+        out = X.squeeze(2).permute(0,2,1)[:,-1,:]
         return out
 
 
@@ -66,9 +67,10 @@ class SIN(nn.Module):
 
 class GradientPolicyPPN(nn.Module):
     def __init__(self, no_of_assets, time_horizon):
+        super(GradientPolicyPPN, self).__init__()
+
         self.price_columns = 4
         self.lstm_units = 16
-
         self.cash_bias_init = 0.01
         self.param = nn.Parameter(torch.full((1,33), self.cash_bias_init))
 
