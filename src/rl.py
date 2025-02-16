@@ -1,73 +1,92 @@
 from tqdm import tqdm
+import torch
 import numpy as np
 from torch.optim import AdamW
 from utils.policy import GradientPolicyPPN
-from utils.dataset import StockDataset
-from torch.utils.data import DataLoader
+from utils.dataset import Data
 from utils.environment import AssetState, TradeEnvironment
 from replay_buffer import PortfolioReplay
+import matplotlib.pyplot as plt
 
-NUM_ASSETS = 16
-MONEY_INVESTED = 1e7
-TIME_HORIZON = 1259
+NUM_ASSETS = 470
+MONEY_INVESTED = 100000
+TOTAL_TIME_HORIZON = 1259
+TRAIN_TIME_HORIZON = 50
 BATCH_SIZE = 50
+N_BATCHES = 10
 
-policy = GradientPolicyPPN(NUM_ASSETS, TIME_HORIZON)
+policy = GradientPolicyPPN(NUM_ASSETS, TRAIN_TIME_HORIZON)
 
 def get_random_action():
-    random_vec = np.random.rand(NUM_ASSETS + 1)
-    return random_vec / np.sum(random_vec)
+    random_vec = torch.rand(NUM_ASSETS+1, requires_grad=False)
+    probas = (random_vec / torch.sum(random_vec)).unsqueeze(0)
+    return probas
+
+get_random_action()
 
 def rl_dpg(trading_data, policy, episodes, alpha=1e-4, gamma=0.99):
     start_time = 0
     asset = AssetState(MONEY_INVESTED, trading_data)
-    train_dataloader = DataLoader(StockDataset(), batch_size=BATCH_SIZE, shuffle=True)
+
     trading_env = TradeEnvironment(asset, start_time)
 
-    optim = AdamW(policy.parameters(), lr=alpha)
+    optimizer = AdamW(policy.parameters(), lr=alpha)
     stats = {'PG Loss': [], 'Returns': []}
-
+    print("AFSASAFS")
     for episode in tqdm(range(episodes)):
-        memory = PortfolioReplay(NUM_ASSETS, TIME_HORIZON)
-        state = trading_env.reset()
-        all_states = []
-        all_rewards = []
 
+        memory = PortfolioReplay(NUM_ASSETS, TOTAL_TIME_HORIZON)
+        for _ in range(N_BATCHES):
 
-        for batch in train_dataloader:
+            all_states = []
+            all_rewards_and_weights = []
+            all_rewards = []
+            start_index = int(memory.draw())
+            step = 0
 
-            start_index = memory.draw()
-            done = False
+            state, done = trading_env.reset(memory.get_W(start_index), start_index)
+
             while not done:
+                print("((((((((((((((((((((((((((((((((((((((((((((((((((()))))))))))))))))))))))))))))))))))))))))))))))))))")
+                prev_asset_weight = trading_env.asset_state.weight
+                # print(prev_asset_weight, "PREV ASSET WEIGHT")
+                # print(state, "STATE")
 
                 if np.random.rand() < 0.8:
-                    action = policy(state)
+                    action = policy(state.float(), prev_asset_weight.unsqueeze(1).float())
                 else:
                     action = get_random_action()
-                
+
+                print(action, "action probabs")
                 state, reward, done = trading_env.step(action)
+
                 all_states.append(state)
+                # print(state, "STATE")
+
+                # print(reward, "REWARD")
                 all_rewards.append(reward)
-                
+
+                all_rewards_and_weights.append((reward, prev_asset_weight))
+                memory.update(start_index + step, trading_env.asset_state.weight)
+                step = step + 1
+                print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
 
 
 
-                # transitions.append((state, action, reward))
-            #     memory.insert([state, action, reward])
+            # all_rewards_and_weights.sort(key=lambda x: x[0])
+            print("##########################################################################################################################################################")
 
-            # if memory.can_sample(batch_size):
-            #     state_b, action_b, reward_b, done_b, next_state_b = memory.sample(batch_size)
-            #     qsa_b = q_network(state_b).gather(1, action_b)
-            #     next_action_b = policy(next_state_b, epsilon)
-            #     next_qsa_b = target_q_network(next_state_b).gather(1, next_action_b)
-            #     target_b = reward_b + ~done_b * gamma * next_qsa_b
-            #     loss = F.mse_loss(qsa_b, target_b)
-            #     q_network.zero_grad()
-            #     loss.backward()
-            #     optim.step()
+            # all_rewards.sort(reverse=True)
+            # gamma_array = np.array([gamma] * len(all_rewards))
+            all_rewards = torch.tensor(all_rewards)
+            loss = -(all_rewards).mean()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            stats['PG Loss'].append(loss.item())
+            stats['Returns'].append(reward)
 
-            #     stats['MSE Loss'].append(loss.item())
+    plt.plot(stats['PG Loss'])
 
-
-# rl_dpg(np.random.rand(16, 1259), policy, 5)
-np.load('stock_data/all_stocks_5yr.csv')
+data = Data().dataset
+rl_dpg(data, policy, 50)

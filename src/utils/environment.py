@@ -1,8 +1,8 @@
-import numpy as np
+import torch
 
 
 class AssetState:
-    def __init__(self, invested_money, overall_data, window_length=10):
+    def __init__(self, invested_money, overall_data, window_length=50):
         self.invested_money = invested_money
         self.overall_data = overall_data
         self.window_length = window_length
@@ -15,39 +15,41 @@ class AssetState:
         self.nb_assets = self.nb_stocks + 1
 
         ## Both should be of size self.nb_stocks
-        self.weight = self._initial_portfolio_weights()
+        self.weight = torch.tensor([1.] + [0.] * self.nb_stocks, requires_grad=False)
+
         self.portfolio = invested_money
     
 
     def end_training_period(self, training_size):
         return int((self.overall_data.shape[1] - self.window_length) * training_size)  
 
-    ## With index 0 as the cash asset, our starting
-    ## weight distribution is such that all our assets
-    ## are just cash before investing into any other stocks
-    ## The distribution is that we have 100% cash
-    def _initial_portfolio_weights(self):
-        return np.array([1.] + [0.] * self.nb_stocks)
     
     def _compute_asset_price_change(self, time_t):
+        eps = 1e-5
         closing_prices = self.overall_data[:, time_t, 3]
+
         opening_prices = self.overall_data[:, time_t, 0]
-        price_change = closing_prices / opening_prices
+
+        ## We add a small epsilon for smoothing to avoid division by zero
+        price_change = (closing_prices + eps) / (opening_prices + eps)
+        print(price_change, "price change")
+
 
         return price_change
     
     def _get_potential_portfolio_increment_after_days(self, interest, time_t):
         price_change = self._compute_asset_price_change(time_t)
-        return np.array([1+interest] + price_change.tolist())
+        return torch.tensor([1+interest] + price_change.tolist(), requires_grad=False)
     
     ## We compute the transaction amount based on the
     ## current portfolio money and the normalized weight
     ## difference. The trade cost is also considered.
     def _transaction_amount(self, action_weights, trade_cost):
-        return self.portfolio * np.linalg.norm((action_weights - self.weight), ord=1) * trade_cost
+        print(self.portfolio * torch.linalg.norm((action_weights - self.weight), ord=1) * trade_cost, "TRANSACTION AMOUNT")
+        return self.portfolio * torch.linalg.norm((action_weights - self.weight), ord=1) * trade_cost
 
     def _update_own_state(self, updated_weights, updated_pf):
-        self.weight = updated_weights
+        self.weight = updated_weights.squeeze(0)
         self.portfolio = updated_pf
     
     def get_asset_status(self):
@@ -66,27 +68,38 @@ class AssetState:
         ## Get the cost of the transaction for this update
         cost = self._transaction_amount(action_weights, trade_cost)
 
+        print(cost, "COSTT")
         ## Amount of money allocated to each asset
         updated_pf_value = self.portfolio * action_weights
+        print(updated_pf_value, "PF VALUE")
 
         ## Amount of money allocated to each asset deducting the cost of doing this transaction
-        pf_value_after_cost = updated_pf_value - np.array([cost]+ [0.]*self.nb_stocks)
+        pf_value_after_cost = updated_pf_value - torch.tensor([cost]+ [0.]*self.nb_stocks, requires_grad=False)
+        print(pf_value_after_cost, "PF VALUE AFTER COST")
+        print(torch.sum(pf_value_after_cost), "PF VALUE SUMMED")
+
 
         pf_value_with_interest = pf_value_after_cost * self._get_potential_portfolio_increment_after_days(interest, time_t)
-        total_pf_sum = np.sum(pf_value_with_interest)
+        print(pf_value_with_interest, "PF VALUE WITH INTEREST")
+
+        total_pf_sum = torch.sum(pf_value_with_interest)
+        print(total_pf_sum, "PF VALUE WITH INTEREST SUMMMED")
 
         updated_weights = pf_value_with_interest / total_pf_sum
-        reward = (total_pf_sum - self.portfolio) / self.portfolio
+        print(self.portfolio, "portfolio")
 
+        
+        reward = (total_pf_sum - self.portfolio) #/ self.portfolio
+        print(reward, "REWARD")
         self._update_own_state(updated_weights, total_pf_sum)
 
         return reward
 
 
-    def reset_state(self, init_time):
+    def reset_state(self, weight_init, init_time):
         self.is_at_end_state = False
         init_timeframe_data = self.get_data_with_time_horizon(init_time)
-        self.weight = self._initial_portfolio_weights()
+        self.weight = weight_init
         self.portfolio = self.invested_money
         state = init_timeframe_data
         return state, self.is_at_end_state
@@ -98,7 +111,7 @@ class TradeEnvironment:
     ## We will start at time index 1 to be able
     ## to account for previous day change
     def __init__(self, asset_state, time_index, train_size=0.85,
-                 trading_cost=0.25/100, interest_rate=0.05/100, window_length=50):
+                 trading_cost=25/1000000, interest_rate=0.25/100, window_length=50):
     
         self.asset_state = asset_state
         self.trading_cost = trading_cost
@@ -107,13 +120,13 @@ class TradeEnvironment:
         self.time_index = time_index + self.window_length
         self.end_train = self.asset_state.end_training_period(train_size)
 
-    def reset(self):
+    def reset(self, weight_init, time):
         """
         Restarts the environment with given
         initial weights and given value of portfolio
         """
-        self.time_index = self.window_length
-        return self.asset_state.reset_state(self.time_index)
+        self.time_index = self.window_length + time
+        return self.asset_state.reset_state(weight_init, self.time_index)
     
 
     def step(self, action):

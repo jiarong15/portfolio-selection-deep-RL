@@ -72,7 +72,7 @@ class GradientPolicyPPN(nn.Module):
         self.price_columns = 4
         self.lstm_units = 16
         self.cash_bias_init = 0.01
-        self.param = nn.Parameter(torch.full((1,33), self.cash_bias_init))
+        self.param = nn.Parameter(torch.full((1,32), self.cash_bias_init))
 
         self.cin = CIN(num_assets=no_of_assets, time_horizon=time_horizon)
         self.sin = SIN(input_size=self.price_columns, hidden_size=self.lstm_units)
@@ -88,8 +88,12 @@ class GradientPolicyPPN(nn.Module):
         ## (num_assets,1)
         data_cin = self.cin(prices).squeeze(1)
         data_sin = self.sin(prices).squeeze(1)
-        data = torch.concat([data_cin, data_sin, prev_portfolio_vect], dim=1)
-        output = torch.concat([data, self.param],dim=0).permute(1,0)
+
+        data = torch.concat([data_cin, data_sin], dim=1)
+        data = torch.concat([data, self.param], dim=0)
+        output = torch.concat([data, prev_portfolio_vect], dim=1).permute(1,0)
+        # data = torch.concat([data_cin, data_sin, prev_portfolio_vect], dim=1)
+        # output = torch.concat([data, self.param], dim=0).permute(1,0)
         pred = self.pred_net(output)
         return pred
 
