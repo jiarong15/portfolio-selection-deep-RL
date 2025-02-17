@@ -32,7 +32,6 @@ class AssetState:
 
         ## We add a small epsilon for smoothing to avoid division by zero
         price_change = (closing_prices + eps) / (opening_prices + eps)
-        print(price_change, "price change")
 
 
         return price_change
@@ -45,7 +44,6 @@ class AssetState:
     ## current portfolio money and the normalized weight
     ## difference. The trade cost is also considered.
     def _transaction_amount(self, action_weights, trade_cost):
-        print(self.portfolio * torch.linalg.norm((action_weights - self.weight), ord=1) * trade_cost, "TRANSACTION AMOUNT")
         return self.portfolio * torch.linalg.norm((action_weights - self.weight), ord=1) * trade_cost
 
     def _update_own_state(self, updated_weights, updated_pf):
@@ -68,29 +66,21 @@ class AssetState:
         ## Get the cost of the transaction for this update
         cost = self._transaction_amount(action_weights, trade_cost)
 
-        print(cost, "COSTT")
         ## Amount of money allocated to each asset
         updated_pf_value = self.portfolio * action_weights
-        print(updated_pf_value, "PF VALUE")
 
         ## Amount of money allocated to each asset deducting the cost of doing this transaction
         pf_value_after_cost = updated_pf_value - torch.tensor([cost]+ [0.]*self.nb_stocks, requires_grad=False)
-        print(pf_value_after_cost, "PF VALUE AFTER COST")
-        print(torch.sum(pf_value_after_cost), "PF VALUE SUMMED")
 
 
         pf_value_with_interest = pf_value_after_cost * self._get_potential_portfolio_increment_after_days(interest, time_t)
-        print(pf_value_with_interest, "PF VALUE WITH INTEREST")
 
         total_pf_sum = torch.sum(pf_value_with_interest)
-        print(total_pf_sum, "PF VALUE WITH INTEREST SUMMMED")
 
         updated_weights = pf_value_with_interest / total_pf_sum
-        print(self.portfolio, "portfolio")
 
         
         reward = (total_pf_sum - self.portfolio) #/ self.portfolio
-        print(reward, "REWARD")
         self._update_own_state(updated_weights, total_pf_sum)
 
         return reward

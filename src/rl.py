@@ -32,7 +32,6 @@ def rl_dpg(trading_data, policy, episodes, alpha=1e-4, gamma=0.99):
 
     optimizer = AdamW(policy.parameters(), lr=alpha)
     stats = {'PG Loss': [], 'Returns': []}
-    print("AFSASAFS")
     for episode in tqdm(range(episodes)):
 
         memory = PortfolioReplay(NUM_ASSETS, TOTAL_TIME_HORIZON)
@@ -47,38 +46,27 @@ def rl_dpg(trading_data, policy, episodes, alpha=1e-4, gamma=0.99):
             state, done = trading_env.reset(memory.get_W(start_index), start_index)
 
             while not done:
-                print("((((((((((((((((((((((((((((((((((((((((((((((((((()))))))))))))))))))))))))))))))))))))))))))))))))))")
                 prev_asset_weight = trading_env.asset_state.weight
-                # print(prev_asset_weight, "PREV ASSET WEIGHT")
-                # print(state, "STATE")
+
 
                 if np.random.rand() < 0.8:
                     action = policy(state.float(), prev_asset_weight.unsqueeze(1).float())
                 else:
                     action = get_random_action()
+                
 
-                print(action, "action probabs")
                 state, reward, done = trading_env.step(action)
 
                 all_states.append(state)
-                # print(state, "STATE")
 
-                # print(reward, "REWARD")
                 all_rewards.append(reward)
 
                 all_rewards_and_weights.append((reward, prev_asset_weight))
                 memory.update(start_index + step, trading_env.asset_state.weight)
                 step = step + 1
-                print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
 
 
-
-            # all_rewards_and_weights.sort(key=lambda x: x[0])
-            print("##########################################################################################################################################################")
-
-            # all_rewards.sort(reverse=True)
-            # gamma_array = np.array([gamma] * len(all_rewards))
-            all_rewards = torch.tensor(all_rewards)
+            all_rewards = torch.tensor(all_rewards, requires_grad=True)
             loss = -(all_rewards).mean()
             optimizer.zero_grad()
             loss.backward()
